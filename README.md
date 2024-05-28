@@ -1,1 +1,1 @@
-# DataBackupSystem
+DataBackupSystem is a Node.js application designed to provide a comprehensive solution for backing up and restoring data securely and efficiently. Leveraging MongoDB for data storage, this application features an Express-based server that facilitates easy data management and recovery. With a focus on simplicity and reliability, DataBackupSystem offers an essential tool for anyone looking to safeguard their data against accidental loss or system failure.
