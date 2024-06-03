@@ -16,6 +16,35 @@ if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
+// Setup a very simple cache object
+let cache = {
+    backupList: {
+        // timestamp of last refresh
+        lastUpdate: 0,
+        // cache duration in milliseconds
+        ttl: 1000 * 60 * 5, // e.g., 5 minutes
+        // stored data
+        data: null,
+    },
+};
+
+function refreshBackupListCache(force = false) {
+    const now = Date.now();
+    if (force || now - cache.backupList.lastUpdate > cache.backupList.ttl) {
+        fs.readdir(BACKUP_DIR, (err, files) => {
+            if (!err) {
+                cache.backupList = {
+                    lastUpdate: Date.now(),
+                    data: files,
+                };
+            }
+        });
+    }
+}
+
+// Preemptively fill the cache
+refreshBackupListCache(true);
+
 app.post('/backup', (req, res) => {
     const backupData = JSON.stringify(req.body);
     const timestamp = (new Date()).toLocaleString().replace(/[\/\s,:]/g, '-'); // Improved timestamp format
@@ -27,18 +56,20 @@ app.post('/backup', (req, res) => {
             console.error('Error creating a backup:', err);
             return res.status(500).send('Error creating a backup');
         }
+        // Invalidate the cache since we have new data
+        refreshBackupListCache(true);
         res.status(201).send({ message: 'Backup created successfully', filename });
     });
 });
 
 app.get('/backup/list', (req, res) => {
-    fs.readdir(BACKUP_DIR, (err, files) => {
-        if (err) {
-            console.error('Error listing backup files:', err);
-            return res.status(500).send('Error listing backup files');
-        }
-        res.status(200).send({ files });
-    });
+    // Use the cached result if available
+    refreshBackupListCache();
+    if (cache.backupList.data !== null) {
+        return res.status(200).send({ files: cache.backupList.data });
+    } else {
+        return res.status(500).send('Error listing backup files');
+    }
 });
 
 app.post('/backup/delete', (req, res) => {
@@ -57,6 +88,8 @@ app.post('/backup/delete', (req, res) => {
             console.error('Error deleting the backup file:', err);
             return res.status(500).send('Error deleting the backup file');
         }
+        // Invalidate the cache since data has changed
+        refreshBackupListCache(true);
         res.status(200).send({ message: 'Backup file deleted successfully', filename });
     });
 });
