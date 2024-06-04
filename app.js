@@ -1,18 +1,47 @@
-require('dotenv').config();
-const express = require('express');
-const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
-const apiRoutes = require('./rndirectory to your routes fileoutes');
-const server = express();
-server.use(bodyParser.json());
-mongoose.connect(process.env.DATABASE_CONNECTION_STRING, {
-  useNewUrlParser: true, 
-  useUnifiedTopology: true
-})
-.then(() => console.log('MongoDB connection established successfully.'))
-.catch(err => console.error('Failed to connect to MongoDB: ', err));
-server.use('/api', apiRoutes);
-const SERVER_PORT = process.env.PORT || 3000;
-server.listen(SERVER_PORT, () => {
-  console.log(`Server is up and running on port ${SERVER_PORT}.`);
+// cache.js
+class Cache {
+    constructor() {
+        this.store = {};
+    }
+
+    get(key) {
+        return this.store[key];
+    }
+
+    set(key, value) {
+        this.store[key] = value;
+    }
+
+    has(key) {
+        return this.store.hasOwnProperty(key);
+    }
+}
+
+module.exports = new Cache();
+```
+
+```javascript
+const cache = require('./cache'); // Assure you point to the correct path of cache.js
+
+function expensiveOperation(arg) {
+    // Placeholder for an expensive operation
+    console.log(`Performing expensive operation for: ${arg}`);
+    return `Result for ${arg}`;
+}
+
+function getCachedOperationResult(arg) {
+    const cacheKey = `expensiveOperation_${arg}`;
+    if (cache.has(cacheKey)) {
+        console.log('Fetching from cache:', cacheKey);
+        return cache.get(cacheKey);
+    } else {
+        const result = expensiveOperation(arg);
+        cache.set(cacheKey, result);
+        return result;
+    }
+}
+
+server.get('/expensive-operation/:arg', (req, res) => {
+    const result = getCachedOperationResult(req.params.arg);
+    res.send(result);
 });
