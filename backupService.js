@@ -7,108 +7,108 @@ require('dotenv').config();
 
 class BackupService {
   constructor() {
-    this.backupDirectory = process.env.BACKUP_DIR || path.join(__dirname, 'backups');
-    this.ensureBackupDirectory();
+    this.backupDirectoryPath = process.env.BACKUP_DIR || path.join(__dirname, 'backups');
+    this.createBackupDirectoryIfNeeded();
   }
 
-  ensureBackupDirectory() {
-    if (!fs.existsSync(this.backupDirectory)) {
-      fs.mkdirSync(this.backupDirectory, {recursive: true});
+  createBackupDirectoryIfNeeded() {
+    if (!fs.existsSync(this.backupDirectoryPath)) {
+      fs.mkdirSync(this.backupDirectoryPath, {recursive: true});
     }
   }
 
-  initiateBackup(data, callback) {
-    const timestamp = new Date().toISOString();
-    const backupFileName = `backup-${timestamp}.json`;
+  performBackup(data, onComplete) {
+    const currentTimeStamp = new Date().toISOString();
+    const backupFileName = `backup-${currentTimeStamp}.json`;
     const compressedBackupFileName = `${backupFileName}.gz`;
-    const backupFilePath = path.join(this.backupDirectory, backupFileName);
-    const compressedBackupFilePath = path.join(this.backupDirectory, compressedBackupFileName);
+    const backupFilePath = path.join(this.backupDirectoryPath, backupFileName);
+    const compressedBackupFilePath = path.join(this.backupDirectoryPath, compressedBackupFileName);
 
-    fs.writeFile(backupFilePath, JSON.stringify(data, null, 2), (err) => {
-      if (err) {
-        console.error(`Failed to save backup: ${backupFileName}`, err);
-        if(callback) callback(err);
+    fs.writeFile(backupFilePath, JSON.stringify(data, null, 2), (writeError) => {
+      if (writeError) {
+        console.error(`Failed to save backup: ${backupFileName}`, writeError);
+        if(onComplete) onComplete(writeError);
         return;
       }
 
-      // Compress the backup file after writing
-      const readStream = fs.createReadStream(backupFilePath);
-      const writeStream = fs.createWriteStream(compressedBackupFilePath);
+      // Compress the just-saved backup file
+      const readFileStream = fs.createReadStream(backupFilePath);
+      const gzipWriteStream = fs.createWriteStream(compressedBackupFilePath);
       const gzip = zlib.createGzip();
 
-      readStream.pipe(gzip).pipe(writeStream).on('finish', (err) => {
-        if (err) {
-          console.error(`Failed to compress backup: ${compressedBackupFileName}`, err);
-          if(callback) callback(err);
+      readFileStream.pipe(gzip).pipe(gzipWriteStream).on('finish', (compressionError) => {
+        if (compressionError) {
+          console.error(`Failed to compress backup: ${compressedBackupFileName}`, compressionError);
+          if(onComplete) onComplete(compressionError);
           return;
         }
-        fs.unlink(backupFilePath, () => { // Clean up uncompressed file
+        fs.unlink(backupFilePath, () => { // Remove the uncompressed file after compression
           console.log(`Backup compressed and saved: ${compressedBackupFileName}`);
-          if(callback) callback(null, compressedBackupFileName);
+          if(onComplete) onComplete(null, compressedBackupFileName);
         });
       });
     });
   }
 
-  restoreBackup(backupFileName, callback) {
-    const backupFilePath = path.join(this.backupDirectory, backupFileName);
-    const decompressedBackupFileName = backupFileName.replace('.gz', '');
-    const decompressedBackupFilePath = path.join(this.backupDirectory, decompressedBackupFileName);
-    const readStream = fs.createReadStream(backupFilePath);
-    const writeStream = fs.createWriteStream(decompressedBackupFilePath);
+  restoreBackup(backupFileNameForRestore, onComplete) {
+    const backupFilePath = path.join(this.backupDirectoryPath, backupFileNameForRestore);
+    const restoredBackupFileName = backupFileNameForRestore.replace('.gz', '');
+    const restoredBackupFilePath = path.join(this.backupDirectoryPath, restoredBackupFileName);
+    const readFileStream = fs.createReadStream(backupFilePath);
+    const writeStreamForRestore = fs.createWriteStream(restoredBackupFilePath);
     const gunzip = zlib.createGunzip();
 
-    readStream.pipe(gunzip).pipe(writeStream).on('finish', (err) => {
-      if (err) {
-        console.error(`Failed to restore backup: ${backupFileName}`, err);
-        if(callback) callback(err);
+    readFileStream.pipe(gunzip).pipe(writeStreamForRestore).on('finish', (restoreError) => {
+      if (restoreError) {
+        console.error(`Failed to restore backup: ${backupFileNameForRestore}`, restoreError);
+        if(onComplete) onComplete(restoreError);
         return;
       }
 
-      console.log(`Backup restored: ${decompressedBackupFileName}`);
-      if(callback) callback(null, decompressedBackupFileName);
+      console.log(`Backup restored: ${restoredBackupFileName}`);
+      if(onComplete) onComplete(null, restoredBackupFileName);
     });
   }
 
-  deleteBackup(backupFileName, callback) {
-    const backupFilePath = path.join(this.backupDirectory, backupFileName);
-    fs.unlink(backupFilePath, (err) => {
-      if (err) {
-        console.error(`Failed to delete backup: ${backupFileName}`, err);
-        if(callback) callback(err);
+  deleteBackupFile(backupFileNameToDelete, onComplete) {
+    const backupFilePath = path.join(this.backupDirectoryPath, backupFileNameToDelete);
+    fs.unlink(backupFilePath, (deletionError) => {
+      if (deletionError) {
+        console.error(`Failed to delete backup: ${backupFileNameToDelete}`, deletionError);
+        if(onComplete) onComplete(deletionError);
         return;
       }
-      console.log(`Backup deleted: ${backupFileName}`);
-      if(callback) callback(null, backupFileName);
+      console.log(`Backup deleted: ${backupFileNameToDelete}`);
+      if(onComplete) onComplete(null, backupFileNameToDelete);
     });
   }
 
-  listBackups(keyword = '') {
-    fs.readdir(this.backupDirectory, (err, files) => {
-      if (err) {
-        console.error('Failed to list backup files', err);
+  searchAndListBackups(searchKeyword = '') {
+    fs.readdir(this.backupDirectoryPath, (error, backupFiles) => {
+      if (error) {
+        console.error('Failed to list backup files', error);
         return;
       }
 
-      const filteredFiles = files.filter(file => file.includes(keyword));
-      console.log('Backup files:', filteredFiles);
+      const matchingBackupFiles = backupFiles.filter(file => file.includes(searchKeyword));
+      console.log('Filtered backup files:', matchingBackupFiles);
     });
   }
 
-  scheduleBackup(cronSyntax, data) {
+  scheduleBackupCreation(cronSyntax, backupData) {
     if (!nodeCron.validate(cronSyntax)) {
-      console.error(`Invalid cron syntax: ${cronSyntax}`);
+      console.error(`Invalid cron syntax for scheduling backup: ${cronSyntax}`);
       return;
     }
 
     nodeCron.schedule(cronSyntax, () => {
       console.log('Initiating scheduled backup...');
-      this.initiateBackup(data, (err, fileName) => {
-        if (err) {
-          console.error('Failed to create backup on schedule');
+      this.performBackup(backupData, (backupError, backupFileName) => {
+        if (backupError) {
+          console.error('Failed to create backup according to schedule');
           return;
         }
-        console.log(`Scheduled backup created: ${fileName}`);
+        console.log(`Scheduled backup successfully created: ${backupFileName}`);
       });
     });
   }
