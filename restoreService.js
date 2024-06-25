@@ -12,7 +12,11 @@ const BACKUP_DIR = process.env.BACKUP_DIR || './backups';
 const RESTORE_DIR = process.env.RESTORE_DIR || './data';
 
 function logError(operation, err) {
-  console.log(`[${new Date().toISOString()}] - Error during ${operation}: ${err.message}`);
+  console.error(`[${new Date().toISOString()}] - An error occurred during ${operation}. Detailed info: ${err.message}`, err);
+}
+
+function enhanceErrorMessage(operation, originalError) {
+  return new Error(`An error occurred during ${operation}: ${originalError.message}`);
 }
 
 const backupRestoreService = {
@@ -22,8 +26,7 @@ const backupRestoreService = {
       return files.filter(file => file.endsWith('.json')); 
     } catch (err) {
       logError('listing backups', err);
-      // Depending on requirements, you could decide to return an empty list or re-throw the error
-      throw new Error(`Error listing backups: ${err.message}`);
+      throw enhanceErrorMessage('listing backups', err);
     }
   },
 
@@ -34,19 +37,19 @@ const backupRestoreService = {
       return JSON.parse(data); 
     } catch (err) {
       logError('fetching backup data', err);
-      throw new Error(`Error fetching backup data: ${err.message}`);
+      throw enhanceErrorMessage('fetching backup data from ' + filePath, err);
     }
   },
 
   restoreData: async function (fileName, data) {
-    const restorePath = path.join(RESTORE_DIR, fileName); // Fixed RESTORE -> RESTORE_DIR
+    const restorePath = path.join(RESTORE_DIR, fileName);
     try {
       const dataString = JSON.stringify(data, null, 2);
-      await writeFile(restorePath, dataString);
-      console.log(`Successfully restored data to ${restorePath}`);
+      await writeFile(restorePath, dataToBackup);
+      console.log(`[${new Date().toISOString()}] - Successfully restored data to ${restorePath}`);
     } catch (err) {
-      logError('restoring data', err);
-      throw new Error(`Error restoring data: ${err.message}`);
+      logError(`restoring data to ${restorePath}`, err);
+      throw enhanceErrorMessage(`restoring data to ${restorePath}`, err);
     }
   }
 };
