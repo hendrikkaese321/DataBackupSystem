@@ -15,23 +15,35 @@ const backupSchema = new mongoose.Schema({
 const Backup = mongoose.model('Backup', backupSchema);
 
 async function addBackup({ backupId, timestamp, source, status }) {
-  const backup = newBackup({
-    backupId,
-    timestamp: new Date(timestamp),
-    source,
-    status
-  });
-  const result = await backup.save();
-  console.log(result);
+  try {
+    const backup = new Backup({
+      backupId,
+      timestamp: new Date(timestamp),
+      source,
+      status
+    });
+    const result = await backup.save();
+    console.log(result);
+  } catch (err) {
+    console.error('Failed to add backup', err);
+  }
 }
 
 async function getBackup(backupId) {
-  return await Backup.findOne({ backupId });
+  try {
+    return await Backup.findOne({ backupData: backupId });
+  } catch (err) {
+    console.error(`Failed to retrieve backup with ID ${backupId}`, err);
+  }
 }
 
 async function updateBackupStatus(backupId, status) {
-  const result = await Backup.updateOne({ backupId }, { $set: { status } });
-  console.log(result);
+  try {
+    const result = await Backup.updateOne({ backupId }, { $set: { status } });
+    console.log(result);
+  } catch (err) {
+    console.error(`Failed to update status for backup ID ${backupId}`, err);
+  }
 }
 
 module.exports = { addBackup, getBackup, updateBackupStatus };
