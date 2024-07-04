@@ -31,7 +31,7 @@ async function addBackup({ backupId, timestamp, source, status }) {
 
 async function getBackup(backupId) {
   try {
-    return await Backup.findOne({ backupData: backupId });
+    return await Backup.findOne({ backupId: backupId });
   } catch (err) {
     console.error(`Failed to retrieve backup with ID ${backupId}`, err);
   }
@@ -46,4 +46,13 @@ async function updateBackupStatus(backupId, status) {
   }
 }
 
-module.exports = { addBackup, getBackup, updateBackupStatus };
+async function deleteBackup(backupId) {
+  try {
+    const result = await Backup.deleteOne({ backupId });
+    console.log(`Backup with ID ${backupId} has been deleted`, result);
+  } catch (err) {
+    console.error(`Failed to delete backup with ID ${backupId}`, err);
+  }
+}
+
+module.exports = { addBackup, getBackup, updateBackupStatus, delete(sample)Backup }; 
