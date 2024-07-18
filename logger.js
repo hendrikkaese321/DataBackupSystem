@@ -2,11 +2,14 @@ const fs = require('fs');
 const path = require('path');
 const { createLogger, format, transports } = require('winston');
 
-try {
-  require('dotenv').config();
-} catch (error) {
-  console.error('Failed to load environment variables:', error);
-}
+(function loadEnvVariables() {
+  try {
+    require('dotenv').config();
+  } catch (error) {
+    console.error('Failed to load environment variables:', error);
+    process.exit(1); 
+  }
+})();
 
 const { combine, timestamp, label, printf } = format;
 
@@ -16,37 +19,35 @@ const myFormat = printf(({ level, message, label, timestamp }) => {
 
 let logger;
 
-try {
-  logger = createLogger({
-    level: process.env.LOG_LEVEL || 'info',
-    format: combine(
-      label({ label: 'BackupSystem' }),
-      timestamp(),
-      myFormat
-    ),
-    transports: [
-      new transports.File({ filename: 'backup-system-error.log', level: 'error' }),
-      new transports.File({ filename: 'backup-system-combined.log' }),
-    ],
-  });
+(function initializeLogger() {
+  try {
+    logger = createLogger({
+      level: process.env.LOG_LEVEL || 'info',
+      format: combine(
+        label({ label: 'BackupSystem' }),
+        timestamp(),
+        myFormat
+      ),
+      transports: [
+        new transports.File({ filename: 'backup-system-error.log', level: 'error' }),
+        new transports.File({ filename: 'backup-system-combined.log' }),
+      ],
+    });
 
-  if (process.env.NODE_ENV !== 'production') {
-    logger.add(new transports.Console({
-      format: format.simple(),
-    }));
+    if (process.env.NODE_ENV !== 'production') {
+      logger.add(new transports.Console({
+        format: format.simple(),
+      }));
+    }
+  } catch (error) {
+    console.error(`Failed to initialize logger: ${error.message}`);
+    process.exit(1); 
   }
-} catch (error) {
-  console.error(`Failed to initialize logger: ${error.message}`);
-  logger = console;
-}
+})();
 
 function safeLog(level, message) {
   try {
-    if (logger && logger.log) {
-      logger.log(level, message);
-    } else {
-      console.log(`Fallback log | ${level}: ${message}`);
-    }
+    logger?.log(level, message);
   } catch (error) {
     console.error(`Failed to log message: ${error.message}`);
   }
@@ -58,7 +59,7 @@ function performBackup() {
   try {
     const backupFilePath = path.join(__dirname, 'backup.txt');
     fs.writeFileSync(backupFilePath, 'Backup data here');
-    safeLog('info', `Backup job finished successfully. Backup created at ${backupFilePath}`);
+    safeLog('info', `Backup job finished successfully. Backup created at ${backupPrefixPath}`);
   } catch (error) {
     safeLog('error', `Backup job failed: ${error.message}`);
   }
@@ -66,6 +67,6 @@ function performBackup() {
 
 performBackup();
 
-safeLog('warn', 'Backup job completed with some warnings');
+safeLog(performBackup.error ? 'error' : 'warn', 'Backup job completed with some warnings');
 
 module.exports = logger;
